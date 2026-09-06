@@ -85,17 +85,28 @@ let mono = "SF Mono" // falls back through CT if absent
 let textColor = CGColor(red: 0xe8 / 255.0, green: 0xea / 255.0, blue: 0xed / 255.0, alpha: 1) // #e8eaed
 let accent = CGColor(red: 0x6c / 255.0, green: 0x8c / 255.0, blue: 1.0, alpha: 1) // #6c8cff
 
-// "dsh" — SVG: font 236 weight 600, text-anchor middle at x=512, baseline y=520
+// "DSH" — SVG-style: font 236 weight 600, centered at x=512, baseline y=520
 let dshFont = ctFont("SFMono-Bold", 236, bold: true)
-drawText("dsh", font: dshFont, color: textColor, centerX: 512, baselineTopDownY: 520)
+drawText("DSH", font: dshFont, color: textColor, centerX: 512, baselineTopDownY: 520)
 
-// "$" — SVG: font 150, anchor middle at x=600, baseline y=742
+// Prompt line: "$" flush against a block cursor on the same baseline, the
+// whole "$█" group centered under "DSH".
+let promptBaseline: CGFloat = 760      // top-down baseline for "$"
 let dollarFont = ctFont("SFMono-Regular", 150, bold: false)
-drawText("$", font: dollarFont, color: accent, centerX: 600, baselineTopDownY: 742)
+let dollarWidth = textWidth(dollarFont, "$")
+let blockWidth: CGFloat = 34
+let gap: CGFloat = 26                  // terminal "$ " spacing
+let groupWidth = dollarWidth + gap + blockWidth
+let groupLeft = (W - groupWidth) / 2
+let dollarX = groupLeft
+let blockX = groupLeft + dollarWidth + gap
 
-// cursor block — SVG: rect x=692 y=600 w=34 h=118 fill #6c8cff
+drawText("$", font: dollarFont, color: accent, x: dollarX, baselineTopDownY: promptBaseline)
+
+// block cursor: 34x118, sits on the prompt line (a touch below the baseline)
+let blockBottom = promptBaseline + 12
 ctx.setFillColor(accent)
-ctx.fill(CGRect(x: 692, y: H - 718, width: 34, height: 118))
+ctx.fill(CGRect(x: blockX, y: H - blockBottom, width: blockWidth, height: 118))
 
 // 4. Export PNG
 guard let image = ctx.makeImage() else { fatalError("no image") }

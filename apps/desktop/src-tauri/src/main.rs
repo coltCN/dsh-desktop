@@ -501,7 +501,7 @@ fn replace_with_external_window(handle: &tauri::AppHandle, target: &str) {
             "main2",
             WebviewUrl::External(target.parse().expect("parsed backend URL")),
         )
-        .title("dsh desktop")
+        .title("DSH desktop")
         .inner_size(1280.0, 840.0)
         .min_inner_size(860.0, 560.0);
         if let Ok(window) = builder.build() {
@@ -637,7 +637,7 @@ fn main() {
             let handle = app.handle().clone();
             let win =
                 WebviewWindowBuilder::new(&handle, "main", WebviewUrl::App("index.html".into()))
-                    .title("dsh desktop")
+                    .title("DSH desktop")
                     .inner_size(1280.0, 840.0)
                     .min_inner_size(860.0, 560.0)
                     .build()?;
