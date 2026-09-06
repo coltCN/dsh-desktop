@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for the dsh desktop main window",
-  "windows": ["main"],
+  "windows": ["main", "main2"],
   "permissions": ["core:default"]
 }

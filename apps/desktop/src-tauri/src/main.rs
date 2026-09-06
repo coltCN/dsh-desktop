@@ -484,14 +484,31 @@ fn verify_bridge(win: &WebviewWindow, markers: &Markers) {
     ));
 }
 
-fn navigate_to(handle: &tauri::AppHandle, target: &str) {
+/// Phase 3 — once the authenticated URL is known, swap the bootstrap page
+/// for a real window whose FIRST request is the token URL. Navigating the
+/// existing window from tauri://localhost to the loopback http origin is a
+/// cross-scheme jump in which the WebView drops the SameSite=Strict auth
+/// cookie exchange, leaving the window on the 401 gate — so the window is
+/// rebuilt as an External URL instead. Order matters: create the new window
+/// before closing the old one so the app never reaches zero windows (which
+/// would trigger an early exit).
+fn replace_with_external_window(handle: &tauri::AppHandle, target: &str) {
     let target = target.to_string();
     let for_thread = handle.clone();
     let _ = handle.run_on_main_thread(move || {
-        if let Some(win) = for_thread.get_webview_window("main") {
-            if let Ok(url) = tauri::Url::parse(&target) {
-                let _ = win.navigate(url);
-            }
+        let builder = WebviewWindowBuilder::new(
+            &for_thread,
+            "main2",
+            WebviewUrl::External(target.parse().expect("parsed backend URL")),
+        )
+        .title("dsh desktop")
+        .inner_size(1280.0, 840.0)
+        .min_inner_size(860.0, 560.0);
+        if let Ok(window) = builder.build() {
+            let _ = window.set_focus();
+        }
+        if let Some(bootstrap) = for_thread.get_webview_window("main") {
+            let _ = bootstrap.close();
         }
     });
 }
@@ -509,7 +526,7 @@ fn run_bootstrap(handle: tauri::AppHandle, win: WebviewWindow) {
             "Reusing an existing dsh web backend.",
         );
         std::thread::sleep(Duration::from_millis(800));
-        navigate_to(&handle, WEB_URL);
+        replace_with_external_window(&handle, WEB_URL);
         return;
     }
 
@@ -574,7 +591,7 @@ fn run_bootstrap(handle: tauri::AppHandle, win: WebviewWindow) {
         Some(url) => {
             app_log(&format!("authenticated web URL ready: {url}"));
             phase(&win, "ok", "Launching dsh desktop…", "");
-            navigate_to(&handle, &url);
+            replace_with_external_window(&handle, &url);
             // Give the page a beat, then prove the plugin control channel.
             std::thread::sleep(Duration::from_secs(2));
             verify_bridge(&win, &markers);
