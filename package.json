@@ -1,0 +1,16 @@
+{
+  "name": "dsh-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "dsh desktop — open-source Tauri 2 desktop client for DeepSeek Harness (dsh). Never vendors dsh code: on startup it checks for dsh, installs it through the official npm channel when missing, composes a dedicated `desktop` profile (base + web-app + dsh-desktop-bridge), and talks to dsh through that plugin.",
+  "scripts": {
+    "build:bridge": "pnpm --filter dsh-desktop-bridge build",
+    "typecheck:bridge": "pnpm --filter dsh-desktop-bridge typecheck",
+    "desktop": "pnpm --filter dsh-desktop-app desktop",
+    "desktop:dev": "pnpm --filter dsh-desktop-app dev"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "license": "MIT"
+}

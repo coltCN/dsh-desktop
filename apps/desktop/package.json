@@ -1,0 +1,17 @@
+{
+  "name": "dsh-desktop-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "dsh desktop — Tauri 2 client shell: installs dsh on first run, composes the `desktop` profile (base + web-app + dsh-desktop-bridge), boots it, and opens the authenticated dsh web UI.",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "desktop": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  },
+  "license": "MIT"
+}

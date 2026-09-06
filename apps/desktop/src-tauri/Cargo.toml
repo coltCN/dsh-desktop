@@ -1,0 +1,19 @@
+[package]
+name = "dsh-desktop"
+version = "0.1.0"
+description = "dsh desktop — Tauri 2 client for DeepSeek Harness (dsh): installs dsh, composes the desktop profile, boots it, hosts its web UI."
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

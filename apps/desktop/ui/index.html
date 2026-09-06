@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dsh desktop</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111318;
+        --fg: #e8eaed;
+        --muted: #8b93a1;
+        --accent: #6c8cff;
+        --error: #e5534b;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg);
+        color: var(--fg);
+        font: 14px/1.5 -apple-system, "PingFang SC", "Segoe UI", system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      .stage { text-align: center; max-width: 34em; padding: 0 24px; }
+      .spinner {
+        width: 36px; height: 36px;
+        margin: 0 auto 22px;
+        border-radius: 50%;
+        border: 3px solid rgba(108, 140, 255, 0.18);
+        border-top-color: var(--accent);
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      #status { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+      #detail { color: var(--muted); margin: 0 0 26px; min-height: 1.5em; }
+      .foot { color: var(--muted); font-size: 12px; opacity: 0.75; }
+      .error #status { color: var(--error); }
+      .error .spinner { animation: none; border-color: rgba(229, 83, 75, 0.25); }
+      .error .spinner::after {
+        content: "!";
+        display: block;
+        color: var(--error);
+        font-weight: 700;
+        font-size: 18px;
+        line-height: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage" id="stage">
+      <div class="spinner"></div>
+      <h1 id="status">Starting dsh desktop…</h1>
+      <p id="detail">Checking for the DeepSeek Harness CLI (dsh)</p>
+      <p class="foot">DeepSeek Harness is installed on demand from the official npm channel — nothing is bundled here.</p>
+    </div>
+    <script>
+      // Driven by the Rust shell through window.eval(); never shown once the
+      // real dsh web UI loads (the window navigates away from this page).
+      window.__dsd = {
+        show(kind, status, detail) {
+          const stage = document.getElementById("stage");
+          stage.classList.toggle("error", kind === "error");
+          stage.classList.toggle("ok", kind === "ok");
+          document.getElementById("status").textContent = status;
+          if (detail) document.getElementById("detail").textContent = detail;
+        }
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+# dsh-desktop-bridge bundle patch.
+#
+# A profile that lists `dsh-desktop-bridge` in `dsh.profile.bundles` gains the
+# row below. Patch semantics: a patch replaces a row's whole `config` value
+# (no deep merge), and layers apply once in `dsh.profile.bundles` order.
+- insert:
+    - id: dsh-desktop-bridge
+      name: dsh-desktop-bridge
+      config:
+        # Loopback-only control server. port 0 asks the kernel for an
+        # ephemeral port, which the plugin announces on stdout as a
+        # `dsh-desktop-ready {json}` line once it is listening.
+        host: 127.0.0.1
+        port: 0

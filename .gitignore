@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# build artifacts
+packages/bridge/lib/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/schemas/
+
+# logs & local data
+*.log
+.dsh-desktop/
+
+# os / editor noise
+.DS_Store
+.hermes-tmp.*
