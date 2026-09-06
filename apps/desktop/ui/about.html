@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About DSH Desktop</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #15181f;
+        --fg: #e8eaed;
+        --muted: #8b93a1;
+        --accent: #6c8cff;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.5 -apple-system, "PingFang SC", "Segoe UI", system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 28px 32px;
+      }
+      .wordmark {
+        font: 700 34px/1 "SF Mono", Menlo, Consolas, monospace;
+        letter-spacing: 0.5px;
+      }
+      .appver { color: var(--muted); font-size: 12px; margin: 8px 0 22px; }
+      .rules {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .rules th, .rules td {
+        text-align: left;
+        vertical-align: top;
+        padding: 7px 2px;
+        border-bottom: 1px solid rgba(139, 147, 161, 0.16);
+        font-weight: 400;
+      }
+      .rules th {
+        color: var(--muted);
+        white-space: nowrap;
+        padding-right: 18px;
+      }
+      .rules td { word-break: break-all; }
+      .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+      .accent { color: var(--accent); font-weight: 600; }
+      .hint { color: var(--muted); font-size: 11px; margin-top: 20px; opacity: 0.8; }
+    </style>
+  </head>
+  <body>
+    <div class="wordmark">DSH</div>
+    <div class="appver" id="app-line">…</div>
+    <table class="rules">
+      <tr><th>DeepSeek Harness (dsh)</th><td class="mono accent" id="dsh-version">…</td></tr>
+      <tr><th>Bridge plugin</th><td class="mono" id="bridge-version">…</td></tr>
+      <tr><th>Profile</th><td class="mono" id="profile">…</td></tr>
+      <tr><th>DSH home</th><td class="mono" id="dsh-home">…</td></tr>
+    </table>
+    <div class="hint">dsh is installed on demand from the official npm channel — this app bundles no harness code.</div>
+    <script>
+      window.__fill = function (d) {
+        document.getElementById("app-line").textContent =
+          d.appName + " · v" + d.appVersion;
+        document.getElementById("dsh-version").textContent =
+          d.dshVersion || "not detected yet — relaunch or install dsh";
+        var bridge = "not connected";
+        if (d.plugin && d.plugin.version) {
+          bridge = d.plugin.version + " (pid " + d.plugin.pid + ")";
+        }
+        document.getElementById("bridge-version").textContent = bridge;
+        document.getElementById("profile").textContent = d.profile || "—";
+        document.getElementById("dsh-home").textContent = d.dshHome || "—";
+      };
+    </script>
+  </body>
+</html>

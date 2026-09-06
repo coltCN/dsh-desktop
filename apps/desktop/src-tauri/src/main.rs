@@ -28,6 +28,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const PROFILE_NAME: &str = "desktop";
@@ -53,6 +54,81 @@ const DRAIN_TIMEOUT: Duration = Duration::from_secs(6);
 
 /// The spawned harness child, killed (gracefully) when the app exits.
 struct ManagedBackend(Mutex<Option<Child>>);
+
+/// Facts the About panel shows; filled in as startup discovers them.
+struct AboutState(Mutex<AboutFacts>);
+
+#[derive(Default, Clone)]
+struct AboutFacts {
+    /// Version string from `dsh --version`, captured at startup.
+    dsh_version: Option<String>,
+    /// The bridge plugin's info JSON once its control channel is verified.
+    plugin: Option<Value>,
+}
+
+const APP_NAME: &str = "DSH Desktop";
+
+/// macOS menu bar (and in-app menu on other platforms): the app menu carries
+/// About, Edit keeps the standard clipboard items the web UI needs.
+fn build_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let about = MenuItem::with_id(app, "about", "About DSH Desktop…", true, None::<&str>)?;
+    let quit = PredefinedMenuItem::quit(app, None)?;
+    let app_menu = Submenu::with_items(
+        app,
+        APP_NAME,
+        true,
+        &[&about, &PredefinedMenuItem::separator(app)?, &quit],
+    )?;
+    let edit_menu = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+    Menu::with_items(app, &[&app_menu, &edit_menu])
+}
+
+/// Open (or focus) the About window and fill it with the discovered facts.
+fn open_about(handle: &tauri::AppHandle) {
+    let facts = match handle.state::<AboutState>().0.lock() {
+        Ok(guard) => guard.clone(),
+        Err(poisoned) => poisoned.into_inner().clone(),
+    };
+    let payload = serde_json::json!({
+        "appName": APP_NAME,
+        "appVersion": env!("CARGO_PKG_VERSION"),
+        "dshVersion": facts.dsh_version,
+        "plugin": facts.plugin,
+        "profile": PROFILE_NAME,
+        "dshHome": dsh_home().display().to_string(),
+    })
+    .to_string();
+    let for_thread = handle.clone();
+    let _ = handle.run_on_main_thread(move || {
+        if let Some(win) = for_thread.get_webview_window("about") {
+            let _ = win.set_focus();
+            return;
+        }
+        let payload = payload.clone();
+        if let Ok(win) =
+            WebviewWindowBuilder::new(&for_thread, "about", WebviewUrl::App("about.html".into()))
+                .title(format!("About {APP_NAME}"))
+                .inner_size(460.0, 500.0)
+                .resizable(false)
+                .build()
+        {
+            let _ = win.eval(&format!("window.__fill && window.__fill({payload})"));
+        }
+    });
+}
 
 /// Lines the stdout reader watches for. `auth_url` gates the window
 /// navigation; `bridge_line` locates the plugin control API.
@@ -260,7 +336,7 @@ fn probe_dsh() -> Option<(String, String)> {
 }
 
 /// Phase 1 — install dsh through the official npm channel when missing.
-fn install_dsh(win: &WebviewWindow) -> Result<String, String> {
+fn install_dsh(win: &WebviewWindow) -> Result<(), String> {
     let _ = fs::create_dir_all(data_dir());
     let log = data_dir().join("install.log");
     phase(win, "info", "Installing dsh…", "dsh was not found — running the official install (npm install -g @deepseek-ai/dsh). This can take a few minutes.");
@@ -279,7 +355,7 @@ fn install_dsh(win: &WebviewWindow) -> Result<String, String> {
             log.display()
         ));
     }
-    probe_dsh().map(|(bin, _)| bin).ok_or_else(|| {
+    probe_dsh().map(|_| ()).ok_or_else(|| {
         "npm reported success but dsh is still not on PATH — restart dsh desktop.".into()
     })
 }
@@ -445,7 +521,7 @@ fn wait_for_web(markers: &Markers) -> Option<String> {
     None
 }
 
-fn verify_bridge(win: &WebviewWindow, markers: &Markers) {
+fn verify_bridge(handle: &tauri::AppHandle, win: &WebviewWindow, markers: &Markers) {
     // The bridge announcement may land slightly after the web URL.
     let mut line = markers.bridge_line.lock().unwrap().clone();
     let deadline = Instant::now() + BRIDGE_WAIT;
@@ -465,9 +541,10 @@ fn verify_bridge(win: &WebviewWindow, markers: &Markers) {
     // Poll the plugin's health endpoint to prove the client↔dsh channel.
     for _ in 0..25 {
         if let Some(health) = http_get_json(port, "/api/desktop/health") {
-            let info = http_get_json(port, "/api/desktop/info").unwrap_or_default();
+            let info = http_get_json(port, "/api/desktop/info");
+            let shown = info.clone().unwrap_or_else(|| health.clone());
             app_log(&format!(
-                "bridge control channel OK on port {port}: {health} {info}"
+                "bridge control channel OK on port {port}: {health} {shown}"
             ));
             phase(
                 win,
@@ -475,6 +552,12 @@ fn verify_bridge(win: &WebviewWindow, markers: &Markers) {
                 "Connected",
                 "dsh desktop control channel is live via dsh-desktop-bridge.",
             );
+            let state = handle.state::<AboutState>();
+            let mut facts = match state.0.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            facts.plugin = Some(shown);
             return;
         }
         std::thread::sleep(POLL_INTERVAL);
@@ -537,19 +620,38 @@ fn run_bootstrap(handle: tauri::AppHandle, win: WebviewWindow) {
         "Looking for the DeepSeek Harness CLI on PATH.",
     );
 
-    let bin = match probe_dsh() {
-        Some((bin, version)) => {
-            app_log(&format!("dsh found: {bin} ({version})"));
-            bin
+    let (bin, version) = match probe_dsh() {
+        Some(found) => {
+            app_log(&format!("dsh found: {} ({})", found.0, found.1));
+            found
         }
         None => match install_dsh(&win) {
-            Ok(bin) => bin,
+            Ok(()) => match probe_dsh() {
+                Some(found) => found,
+                None => {
+                    phase(
+                        &win,
+                        "error",
+                        "Could not start dsh desktop",
+                        "dsh was installed but is still not on PATH — restart DSH Desktop.",
+                    );
+                    return;
+                }
+            },
             Err(message) => {
                 phase(&win, "error", "Could not start dsh desktop", &message);
                 return;
             }
         },
     };
+    {
+        let state = handle.state::<AboutState>();
+        let mut facts = match state.0.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        facts.dsh_version = Some(version);
+    }
 
     phase(
         &win,
@@ -594,7 +696,7 @@ fn run_bootstrap(handle: tauri::AppHandle, win: WebviewWindow) {
             replace_with_external_window(&handle, &url);
             // Give the page a beat, then prove the plugin control channel.
             std::thread::sleep(Duration::from_secs(2));
-            verify_bridge(&win, &markers);
+            verify_bridge(&handle, &win, &markers);
         }
         None => {
             // Did the backend die on its own, or are we just past the clock?
@@ -633,6 +735,13 @@ fn run_bootstrap(handle: tauri::AppHandle, win: WebviewWindow) {
 fn main() {
     tauri::Builder::default()
         .manage(ManagedBackend(Mutex::new(None)))
+        .manage(AboutState(Mutex::new(AboutFacts::default())))
+        .menu(build_menu)
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "about" {
+                open_about(app);
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
             let win =
